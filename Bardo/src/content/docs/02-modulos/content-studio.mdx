@@ -1,0 +1,420 @@
+---
+title: Content Studio
+description: Workflow de geração de conteúdo, janelas temporais e controle de tom de voz para produção de conteúdo IA-assistido.
+---
+
+import {
+  Card,
+  CardGrid,
+  Tabs,
+  TabItem,
+  Aside,
+} from "@astrojs/starlight/components";
+
+## Visão Geral do Content Studio
+
+**Content Studio** é a camada de produção que canaliza a inteligência do RAG para criar conteúdo estruturado, verificável e com controle fino sobre tom, contexto e publicação.
+
+### Stack de Tecnologia
+
+<CardGrid>
+  <Card title="Astro (Frontend)" icon="rocket">
+    Interface administrativa para criação e programação de conteúdo.
+  </Card>
+  <Card title="LangChain" icon="brain">
+    Orquestração de cadeia de geradores (drafts, reviews, refinement).
+  </Card>
+  <Card title="Supabase" icon="database">
+    Persistência de templates, versões e histórico de conteúdo.
+  </Card>
+</CardGrid>
+
+## 1. Anatomy de um Content Job
+
+Um **Content Job** é uma unidade de produção que agrupa todas as informações necessárias para gerar um piece de conteúdo.
+
+```typescript
+interface ContentJob {
+  id: string;
+  title: string;
+  description: string;
+  source_topics: string[]; // Tópicos recuperados do RAG
+  tone_of_voice: "formal" | "casual" | "technical" | "narrative";
+  content_type: "article" | "thread" | "snippet" | "summary";
+  temporal_window: {
+    start_date: Date;
+    end_date: Date;
+    include_historical: boolean;
+  };
+  target_platform: "twitter" | "blog" | "newsletter" | "internal";
+  output_language: "pt" | "en" | "es";
+  status: "draft" | "review" | "approved" | "published";
+  version: number;
+  created_at: Date;
+  scheduled_publish_at?: Date;
+}
+```
+
+## 2. Workflow de Geração
+
+### Estágios Sequenciais
+
+```
+1. Topic Research (RAG Query)
+    ↓
+2. Draft Generation (LLM + Prompt Template)
+    ↓
+3. Refinement (Tone Check + Structure Validation)
+    ↓
+4. Review (Human-in-the-Loop ou Automated)
+    ↓
+5. Approval (Publishing Gate)
+    ↓
+6. Scheduled Publish (ou Manual)
+```
+
+### Implementação do Pipeline
+
+```typescript
+import { ChainRunner } from "@crypto/orchestration";
+
+class ContentGenerationPipeline {
+  private chainRunner: ChainRunner;
+
+  async generate(job: ContentJob): Promise<GeneratedContent> {
+    try {
+      // Stage 1: Topic Research
+      const topicDocs = await this.ragQuery(job.source_topics);
+
+      // Stage 2: Draft Generation
+      const draft = await this.generateDraft(job, topicDocs);
+
+      // Stage 3: Refinement
+      const refined = await this.refineContent(draft, job.tone_of_voice);
+
+      // Stage 4: Review Hooks
+      const review = await this.runReview(refined, job.content_type);
+
+      return {
+        job_id: job.id,
+        version: job.version + 1,
+        draft: refined,
+        review_notes: review.notes,
+        status: "ready_for_approval",
+      };
+    } catch (error) {
+      console.error("Pipeline error:", error);
+      throw new PipelineError(error.message);
+    }
+  }
+
+  private async generateDraft(
+    job: ContentJob,
+    docs: Document[],
+  ): Promise<string> {
+    const prompt = generatePrompt(job, docs);
+    const response = await this.llm.generate({ prompt });
+    return response.text;
+  }
+}
+```
+
+## 3. Temporal Windows (Janelas Temporais)
+
+Controle fino sobre **quando** os dados foram coletados e **qual período** o conteúdo deve cobrir.
+
+### Configuração de Janela
+
+```json
+{
+  "job_id": "content_job_2024_03_crypto_surge",
+  "temporal_window": {
+    "start_date": "2024-02-25",
+    "end_date": "2024-03-02",
+    "duration_days": 6,
+    "include_historical_context": true,
+    "historical_lookback_days": 30
+  },
+  "recency_bias": 0.8,
+  "data_cutoff": "2024-02-25T00:00:00Z"
+}
+```
+
+### Lógica de Seleção
+
+1. **Janela Primária**: documentos dentro do intervalo [start_date, end_date]
+2. **Contexto Histórico**: se habilitado, inclui dados até X dias antes
+3. **Recency Bias**: aumenta peso de dados mais recentes (0.0 = uniform, 1.0 = only latest)
+
+```typescript
+function filterByTemporalWindow(
+  documents: Document[],
+  window: TemporalWindow,
+): Document[] {
+  return documents
+    .filter((doc) => {
+      const docDate = new Date(doc.metadata.timestamp);
+      return (
+        docDate >= new Date(window.start_date) &&
+        docDate <= new Date(window.end_date)
+      );
+    })
+    .sort((a, b) => {
+      // Apply recency bias
+      const aScore =
+        new Date(a.metadata.timestamp).getTime() * window.recency_bias;
+      const bScore =
+        new Date(b.metadata.timestamp).getTime() * window.recency_bias;
+      return bScore - aScore; // Newer first
+    });
+}
+```
+
+<Aside type="tip">
+  Use `include_historical_context: true` para resumir contexto; `false` para
+  análises muito focadas.
+</Aside>
+
+## 4. Tone of Voice (Tom de Voz)
+
+Styles executáveis que modulam o LLM output para tom específico.
+
+### Presets Disponíveis
+
+| Tone          | Descrição                 | Use Case                     |
+| ------------- | ------------------------- | ---------------------------- |
+| **formal**    | Técnico, corporativo      | Relatórios para stakeholders |
+| **casual**    | Conversacional, acessível | Social media, threads        |
+| **technical** | Jargão aprofundado        | Docs técnicas, white papers  |
+| **narrative** | Story-driven, humanizado  | Blog posts, case studies     |
+
+### System Prompt por Tone
+
+```typescript
+const TONE_PROMPTS = {
+  formal: `You are a professional analyst writing for a technical audience.
+  Use precise language, avoid slang, and cite all sources.`,
+
+  casual: `You are a friendly crypto enthusiast sharing insights on Twitter.
+  Be conversational, use emojis sparingly, and keep it digestible.`,
+
+  technical: `You are an expert deep-diving into protocol mechanics.
+  Use technical terminology, explain assumptions, and be mathematically precise.`,
+
+  narrative: `You are a storyteller connecting data points into insights.
+  Build narrative arcs, use examples, and make it relatable.`,
+};
+
+// Usage
+const systemPrompt = TONE_PROMPTS[job.tone_of_voice];
+const finalPrompt = `${systemPrompt}\n\nContent:\n${contentTemplate}`;
+```
+
+## 5. Content Types
+
+### Article
+
+Conteúdo longo-form (800-2000 palavras), estruturado com seções.
+
+```markdown
+# [Título Auto-Gerado]
+
+## Intro (2-3 sentences)
+
+## Main Sections (2-4)
+
+### Section 1: Context
+
+### Section 2: Analysis
+
+### Section 3: Implications
+
+## Conclusion & Call-to-Action
+
+## Sources
+
+- [Link 1] - Citation
+- [Link 2] - Citation
+```
+
+### Thread
+
+Tweet thread otimizado para X (280 char/tweet, 5-10 tweets).
+
+```
+🧵 [Opening Hook]
+
+1️⃣ [Point 1]
+2️⃣ [Point 2]
+3️⃣ [Point 3]
+...
+🔗 Full analysis: [link]
+```
+
+### Snippet
+
+Conteúdo curto (50-150 chars) para social/newsletters.
+
+```
+"[Hot Take] + [Data Point] → [Implication]"
+```
+
+## 6. Admin Interface (Content Studio UI)
+
+### Form de Criação
+
+```astro
+---
+// apps/studio/src/pages/create.astro
+import { ContentForm } from '@crypto/studio/components';
+---
+
+<layout title="Create Content Job">
+  <ContentForm
+    initialData={defaultJob}
+    onSubmit={async (job) => {
+      const response = await fetch('/api/jobs', {
+        method: 'POST',
+        body: JSON.stringify(job)
+      });
+    }}
+  />
+</layout>
+```
+
+### Campos do Form
+
+- **Title & Description**: Briefing
+- **Source Topics**: Multi-select (tagsearch de RAG)
+- **Tone**: Dropdown (formal, casual, technical, narrative)
+- **Content Type**: Radio (article, thread, snippet)
+- **Temporal Window**: Date range picker
+- **Target Platform**: Checkbox group
+- **Language**: Select
+- **Scheduled Publish**: DateTime picker (opcional)
+
+## 7. Integração com Supabase
+
+### Schema de Conteúdo
+
+```sql
+-- Jobs
+CREATE TABLE content_jobs (
+  id UUID PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT,
+  tone_of_voice TEXT,
+  content_type TEXT,
+  status TEXT,
+  source_topics JSONB,
+  temporal_window JSONB,
+  created_at TIMESTAMP,
+  scheduled_publish_at TIMESTAMP
+);
+
+-- Versões
+CREATE TABLE content_versions (
+  id UUID PRIMARY KEY,
+  job_id UUID REFERENCES content_jobs(id),
+  version INT,
+  content TEXT,
+  review_notes JSONB,
+  status TEXT,
+  created_at TIMESTAMP
+);
+
+-- Audit Log
+CREATE TABLE content_audit_log (
+  id UUID PRIMARY KEY,
+  job_id UUID REFERENCES content_jobs(id),
+  action TEXT,
+  actor_id UUID,
+  timestamp TIMESTAMP
+);
+```
+
+### RLS (Row Level Security)
+
+```sql
+-- Usuários veem apenas seus próprios jobs
+CREATE POLICY "users_own_jobs" ON content_jobs
+  FOR SELECT USING (auth.uid() = created_by_id);
+
+-- Approve requer role 'editor' ou superior
+CREATE POLICY "editors_approve_content" ON content_jobs
+  FOR UPDATE USING (
+    auth.jwt() ->> 'user_role' IN ('editor', 'admin')
+  );
+```
+
+## 8. Publishing & Scheduling
+
+### Manual Publishing
+
+```typescript
+async function publishContent(jobId: string) {
+  const job = await getJob(jobId);
+
+  if (job.status !== "approved") {
+    throw new Error("Content must be approved before publishing");
+  }
+
+  const platforms = await resolvePlatforms(job.target_platform);
+
+  for (const platform of platforms) {
+    await platform.publish({
+      content: job.final_content,
+      metadata: {
+        job_id: job.id,
+        published_at: new Date(),
+        sources: job.sources,
+      },
+    });
+  }
+
+  await updateJobStatus(jobId, "published");
+}
+```
+
+### Scheduled Publishing
+
+```typescript
+// Cron job que roda a cada minuto
+import { createClient } from "@supabase/supabase-js";
+
+async function publishScheduledContent() {
+  const supabase = createClient(url, key);
+
+  const { data } = await supabase
+    .from("content_jobs")
+    .select()
+    .eq("status", "approved")
+    .lt("scheduled_publish_at", new Date());
+
+  for (const job of data) {
+    await publishContent(job.id);
+  }
+}
+
+// Em apps/api/src/tasks/publish-cron.ts
+```
+
+## Monitoring & Metrics
+
+### Métricas de Conteúdo
+
+- **Generation Time**: tempo de draft até versão final
+- **Approval Rate**: % de jobs aprovados vs. rejeitados
+- **Publish Success Rate**: % de tentativas bem-sucedidas
+- **Engagement** (pós-publicação): views, compartilhamentos, comentários
+
+```bash
+# Acesso via Prometheus
+GET /studio/api/metrics?job_id={id}
+```
+
+## Próximas Etapas
+
+- ✅ [Retrieval RAG](/02-modulos/retrieval-rag/)
+- ✅ [Design Tokens](/03-design-system/tokens/)
+- ✅ [Setup do Monorepo](/01-engenharia/setup-monorepo/)

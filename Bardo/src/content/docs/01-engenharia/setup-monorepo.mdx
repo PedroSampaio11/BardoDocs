@@ -1,0 +1,239 @@
+---
+title: Setup do Monorepo
+description: Configuração de ambiente, Bun, Turborepo e variáveis de ambiente para o Cryptograma.
+---
+
+import {
+  Card,
+  CardGrid,
+  Tabs,
+  TabItem,
+  Aside,
+} from "@astrojs/starlight/components";
+
+## Visão Geral
+
+O Cryptograma utiliza uma arquitetura de **monorepo** com **Bun** como package manager e executor de tasks, complementado por **Turborepo** para otimização de builds e caching inteligente.
+
+### Stack de Desenvolvimento
+
+<CardGrid>
+  <Card title="Bun" icon="rocket">
+    Runtime JavaScript ultra-rápido, package manager e task executor. Substitui
+    Node.js + npm.
+  </Card>
+  <Card title="Turborepo" icon="gear">
+    Aumenta a velocidade de builds com caching distribuído e execução paralela
+    de tasks.
+  </Card>
+  <Card title="Supabase" icon="database">
+    Infraestrutura de dados: PostgreSQL, auth, real-time e storage.
+  </Card>
+</CardGrid>
+
+## Instalação Inicial
+
+### Pré-requisitos
+
+- **Bun** (v1.0+): [Instalar Bun](https://bun.sh)
+- **Git**: Controle de versão
+- **Editor**: VS Code recomendado
+
+### Clonar e Configurar
+
+```bash
+# Clone o repositório
+git clone https://github.com/FourCoders-Team/cryptograma_bardo.git
+cd cryptograma_bardo
+
+# Instale dependências com Bun
+bun install
+
+# Configure variáveis de ambiente
+cp .env.example .env.local
+```
+
+<Aside type="tip">
+  O Bun instala dependências **3-4x mais rápido** que npm. Use `bun install`
+  como padrão.
+</Aside>
+
+## Estrutura do Monorepo
+
+```
+cryptograma_bardo/
+├── apps/
+│   ├── web/              # Frontend Astro (BardoDocs)
+│   ├── api/              # Backend Node.js / Bun
+│   └── studio/           # Content Studio (admin)
+├── packages/
+│   ├── @crypto/core/     # Lógica de RAG e embeddings
+│   ├── @crypto/db/       # ORM e queries (Prisma)
+│   └── @crypto/types/    # Tipos TypeScript compartilhados
+├── turbo.json            # Configuração do Turborepo
+├── bun.lockb             # Lock file do Bun
+└── package.json          # Root workspace
+```
+
+## Variáveis de Ambiente
+
+Crie um arquivo `.env.local` na raiz com as seguintes variáveis:
+
+```bash
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# LLM & Embeddings
+OPENAI_API_KEY=sk-...
+EMBEDDING_MODEL=text-embedding-3-small
+
+# RAG
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=your-key
+
+# Deploy
+FLY_API_TOKEN=your-fly-token
+REMOTE_CACHE_URL=https://cache.example.com
+```
+
+<Aside type="caution">
+  Nunca committe `.env.local` para o repositório. Use `.env.example` como
+  template.
+</Aside>
+
+## Scripts e Tarefas do Bun
+
+### Root-level Tasks
+
+```bash
+# Desenvolvimento local
+bun dev              # Inicia todos os apps em watch mode
+
+# Build
+bun build            # Build de todos os packages via Turborepo
+bun build --filter=web  # Build específico da app `web`
+
+# Testes
+bun test             # Executa testes de todos os packages
+bun test --watch     # Watch mode para testes
+
+# Limpeza
+bun clean            # Remove dist e .turbo
+bun clean:cache      # Limpa cache local do Turborepo
+```
+
+### App Específicas
+
+```bash
+# BardoDocs (Web)
+cd apps/web
+bun dev              # Starts Astro dev server (localhost:3000)
+bun build            # Build production site
+
+# API
+cd apps/api
+bun dev              # Starts backend (localhost:4000)
+bun seed             # Seed database
+
+# Studio
+cd apps/studio
+bun dev              # Starts admin interface
+```
+
+## Turborepo: Caching e Pipeline
+
+O `turbo.json` define o pipeline de tasks e dependências:
+
+```json
+{
+  "extends": ["//"],
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "test": {
+      "outputs": ["coverage/**"],
+      "cache": false
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+<Aside type="note">
+  Turborepo cacheiza builds automaticamente. Para limpar cache: `bun
+  clean:cache`
+</Aside>
+
+## Deploy via Fly.io
+
+### Pré-requisito: Fly CLI
+
+```bash
+# Instale Fly CLI
+curl -L https://fly.io/install.sh | sh
+
+# Login
+flyctl auth login
+```
+
+### Deploy da API
+
+```bash
+cd apps/api
+flyctl launch                    # Primeira vez (gera fly.toml)
+flyctl deploy                    # Deploy
+flyctl logs                      # Ver logs em tempo real
+```
+
+### Deploy do BardoDocs
+
+```bash
+cd apps/web
+bun build                        # Build estático
+flyctl launch                    # Primeira vez
+flyctl deploy                    # Deploy
+```
+
+<Aside type="tip">
+  Use `flyctl secrets set KEY=value` para gerenciar variáveis de ambiente em
+  produção.
+</Aside>
+
+## Database: Supabase
+
+### Conectar ao Supabase
+
+```bash
+# Use a Supabase CLI para migrações
+supabase init        # Cria estrutura local
+supabase link        # Conecta ao projeto remoto
+supabase migrations pull  # Sincroniza schema
+```
+
+### Seed Inicial
+
+```bash
+# Populate database com dados de teste
+bun seed
+```
+
+## Troubleshooting
+
+| Problema            | Solução                                                      |
+| ------------------- | ------------------------------------------------------------ |
+| `bun install` falha | Certifique-se que Bun v1.0+ está instalado (`bun --version`) |
+| Portas em conflito  | Altere porta em `.env.local` ou termine processo anterior    |
+| Cache desatualizado | Execute `bun clean:cache` e reinstale                        |
+
+## Próximas Etapas
+
+- ✅ [Configurando RAG e Retrieval](/02-modulos/retrieval-rag/)
+- ✅ [Content Studio Guide](/02-modulos/content-studio/)
+- ✅ [Design Tokens](/03-design-system/tokens/)

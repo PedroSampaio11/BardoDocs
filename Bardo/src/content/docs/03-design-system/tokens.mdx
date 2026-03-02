@@ -1,0 +1,438 @@
+---
+title: Design Tokens
+description: Tokens de design, tipografia, espaçamento e componentes reutilizáveis do Cryptograma.
+---
+
+import {
+  Card,
+  CardGrid,
+  Tabs,
+  TabItem,
+  Aside,
+} from "@astrojs/starlight/components";
+
+## Design System: Cryptograma
+
+O Design System do Cryptograma é construído sobre **tokens** – valores reutilizáveis que garantem consistência visual e facilitam manutenção em larga escala.
+
+## 1. Paleta de Cores
+
+### Cores Nucleares
+
+A identidade visual do Cryptograma é baseada em uma paleta dark-first que comunica sofisticação técnica.
+
+| Token                    | Valor     | Uso                                    | Exemplo                |
+| ------------------------ | --------- | -------------------------------------- | ---------------------- |
+| `--color-bg-primary`     | `#030712` | Background principal do site e cards   | Fundo geral            |
+| `--color-text-primary`   | `#F9FAFB` | Texto principal e headings             | Textos no content body |
+| `--color-text-secondary` | `#8F97A5` | Subtítulos, metadata, texto secundário | Descrições, datas      |
+| `--color-card-bg`        | `#090E1A` | Background de cards e containers       | Dashboard cards        |
+| `--color-card-border`    | `#1F2937` | Bordas sutis de componentes            | Divisors               |
+
+### Escala de Cinza
+
+Para componentes com mais granularidade:
+
+```css
+:root {
+  --color-gray-950: #030712; /* Quase preto */
+  --color-gray-900: #0f1119; /* Muito escuro */
+  --color-gray-800: #1f212e; /* Escuro */
+  --color-gray-700: #2d3142; /* Médio-escuro */
+  --color-gray-600: #3f4557; /* Médio */
+  --color-gray-500: #6b7280; /* Médio-claro */
+  --color-gray-400: #8f97a5; /* Claro (sub-color) */
+  --color-gray-300: #d1d5db; /* Muito claro */
+  --color-gray-100: #f3f4f6; /* Quase branco */
+  --color-gray-50: #f9fafb; /* Branco puro (texto) */
+}
+```
+
+### Accent Colors (Propósito)
+
+| Token                    | Valor     | Propósito                             |
+| ------------------------ | --------- | ------------------------------------- |
+| `--color-accent-primary` | `#3B82F6` | Links, CTAs principais, highlight     |
+| `--color-accent-low`     | `#1E3A8A` | Hover, backgrounds com destaque baixo |
+| `--color-accent-high`    | `#BFDBFE` | Focus outline, badges highlight       |
+| `--color-success`        | `#10B981` | Status OK, confirmação                |
+| `--color-warning`        | `#F59E0B` | Atenção, pendência                    |
+| `--color-danger`         | `#EF4444` | Error, exclusão                       |
+| `--color-info`           | `#06B6D4` | Informação, tips                      |
+
+## 2. Tipografia
+
+### Fonte Principal: Space Grotesk
+
+**Space Grotesk** é a fonte padrão do Cryptograma – un sans-serif geométrica com bastante espaço, ideal para interfaces técnicas.
+
+```css
+@import "@fontsource/space-grotesk";
+
+:root {
+  --font-family: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  --font-weight-light: 300;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+}
+```
+
+### Escala de Tamanhos
+
+| Token       | Size | Line Height | Uso                   |
+| ----------- | ---- | ----------- | --------------------- |
+| `--fs-xs`   | 12px | 1.33 (16px) | Labels, metadata      |
+| `--fs-sm`   | 14px | 1.43 (20px) | Secondary text        |
+| `--fs-base` | 16px | 1.5 (24px)  | Body text, padrão     |
+| `--fs-lg`   | 18px | 1.56 (28px) | Card titles, emphasis |
+| `--fs-xl`   | 20px | 1.4 (28px)  | Section headings      |
+| `--fs-2xl`  | 24px | 1.33 (32px) | Page titles           |
+| `--fs-3xl`  | 32px | 1.25 (40px) | Hero headings         |
+
+### Regra de Tipografia
+
+```css
+/* Heading h1 */
+h1 {
+  font-size: var(--fs-3xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.25;
+  color: var(--color-text-primary);
+}
+
+/* Heading h2 */
+h2 {
+  font-size: var(--fs-2xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1.33;
+  color: var(--color-text-primary);
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
+
+/* Body */
+p {
+  font-size: var(--fs-base);
+  font-weight: var(--font-weight-regular);
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+/* Strong / Emphasis */
+strong {
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+```
+
+## 3. Espaçamento
+
+### Escala Modular
+
+Baseada no ratio de 1.25x para consistência proporcional:
+
+```css
+:root {
+  --space-0: 0;
+  --space-1: 4px; /* 0.25rem */
+  --space-2: 8px; /* 0.5rem */
+  --space-3: 12px; /* 0.75rem */
+  --space-4: 16px; /* 1rem */
+  --space-6: 24px; /* 1.5rem */
+  --space-8: 32px; /* 2rem */
+  --space-12: 48px; /* 3rem */
+  --space-16: 64px; /* 4rem */
+  --space-20: 80px; /* 5rem */
+  --space-24: 96px; /* 6rem */
+}
+```
+
+### Aplicação Prática
+
+```css
+/* Padding padrão de card */
+.card {
+  padding: var(--space-6);
+}
+
+/* Margin entre sections */
+section {
+  margin-bottom: var(--space-12);
+}
+
+/* Gap em grid */
+.grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+/* Margin-top para headings dentro de content */
+.content h2 {
+  margin-top: var(--space-8);
+  margin-bottom: var(--space-4);
+}
+```
+
+## 4. Sombras
+
+Para adicionar profundidade sem excesso de dramaticidade:
+
+```css
+:root {
+  /* Sombra sutil: card hover */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+
+  /* Sombra médium: containers principais */
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.15);
+
+  /* Sombra grande: modals, dropdowns */
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.25);
+
+  /* Glassmorphism: apenas border + backdrop */
+  --glassmorphism-border: 1px solid rgba(255, 255, 255, 0.1);
+}
+```
+
+## 5. Componentes Reutilizáveis
+
+### Card
+
+Contêiner padrão para agrupar conteúdo.
+
+```jsx
+// Uso no MDX
+<Card title="Inteligência de Dados" icon="chart">
+  Pipelines de ingestão, ETL/ELT, e integrações do monorepo.
+</Card>
+```
+
+**Estilos Aplicados:**
+
+```css
+.card {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-card-border);
+  border-radius: 10px;
+  padding: var(--space-6);
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s ease;
+}
+
+.card:hover {
+  border-color: var(--color-accent-primary);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+.card h3 {
+  color: var(--color-text-primary);
+  font-size: var(--fs-lg);
+  margin-bottom: var(--space-2);
+}
+
+.card p {
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+}
+```
+
+### Button
+
+```jsx
+<button class="btn btn-primary">
+  Action CTA
+</button>
+
+<button class="btn btn-secondary">
+  Secondary
+</button>
+
+<button class="btn btn-ghost">
+  Minimal
+</button>
+```
+
+**Variantes:**
+
+```css
+.btn {
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  border-radius: 6px;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-family);
+}
+
+.btn-primary {
+  background: var(--color-accent-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-low);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.3);
+}
+
+.btn-secondary {
+  background: var(--color-card-bg);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-card-border);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-accent-primary);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-accent-primary);
+}
+
+.btn-ghost:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+```
+
+### Badge
+
+Para status, tags, labels.
+
+```jsx
+<span class="badge badge-success">v2-preview</span>
+<span class="badge badge-warning">Beta</span>
+<span class="badge badge-danger">Deprecated</span>
+```
+
+**Implementação:**
+
+```css
+.badge {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: 4px;
+  font-size: var(--fs-xs);
+  font-weight: var(--font-weight-medium);
+}
+
+.badge-success {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-success);
+  border: 1px solid var(--color-success);
+}
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-warning);
+  border: 1px solid var(--color-warning);
+}
+
+.badge-danger {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+```
+
+### Aside (Tip, Caution, Note)
+
+```jsx
+<Aside type="tip">
+  Este é um helpful tip para usuários.
+</Aside>
+
+<Aside type="caution">
+  Aviso importante – leia com atenção!
+</Aside>
+
+<Aside type="note">
+  Informação complementar.
+</Aside>
+```
+
+**CSS Customizado:**
+
+```css
+.aside {
+  padding: var(--space-4);
+  border-left: 4px solid;
+  background: rgba(59, 130, 246, 0.08);
+  border-radius: 4px;
+  margin: var(--space-4) 0;
+}
+
+.aside-tip {
+  border-left-color: var(--color-info);
+  background: rgba(6, 182, 212, 0.08);
+}
+
+.aside-caution {
+  border-left-color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.aside-note {
+  border-left-color: var(--color-accent-primary);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.aside strong {
+  color: var(--color-text-primary);
+}
+```
+
+## 6. Breakpoints (Responsive Design)
+
+```css
+:root {
+  --bp-mobile: 320px;
+  --bp-tablet: 768px;
+  --bp-desktop: 1024px;
+  --bp-wide: 1440px;
+}
+
+/* Mobile-first approach */
+@media (min-width: 768px) {
+  /* Tablet & above */
+}
+
+@media (min-width: 1024px) {
+  /* Desktop & above */
+}
+```
+
+## 7. Implementação no CSS Global
+
+Todos os estilos estão centralizados em `src/styles/custom.css`:
+
+```bash
+# Estrutura dos arquivos
+src/
+├── styles/
+│   ├── custom.css          # Global tokens & utilities
+│   ├── components/
+│   │   ├── card.css
+│   │   ├── button.css
+│   │   └── badge.css
+│   └── utilities/
+│       ├── spacing.css
+│       └── typography.css
+```
+
+## 8. Usage Checklist
+
+- ✅ Use tokens de cores: `var(--color-*)`
+- ✅ Use tokens de espaçamento: `var(--space-*)`
+- ✅ Use tokens de tipografia: `var(--fs-*)`, `var(--font-weight-*)`
+- ✅ Sempre siga escala modular (nunca valores hardcoded)
+- ✅ Teste em modo light/dark se aplicável
+- ✅ Mantenha consistência com componentes Starlight
+
+## Próximas Etapas
+
+- ✅ [Setup do Monorepo](/01-engenharia/setup-monorepo/)
+- ✅ [Retrieval RAG](/02-modulos/retrieval-rag/)
+- ✅ [Content Studio](/02-modulos/content-studio/)

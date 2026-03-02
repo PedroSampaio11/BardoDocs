@@ -1,0 +1,336 @@
+---
+title: Retrieval RAG
+description: Arquitetura de Retrieval, embeddings, indexação e orquestração de respostas para busca semântica.
+---
+
+import {
+  Card,
+  CardGrid,
+  Tabs,
+  TabItem,
+  Aside,
+  Icon,
+} from "@astrojs/starlight/components";
+
+## Visão Geral do RAG
+
+**Retrieval Augmented Generation (RAG)** é o coração do Cryptograma. Ele combina busca semântica sobre dados do X com geração contextualizada de respostas via LLM.
+
+### Fluxo Principal
+
+```
+1. Ingestão de Dados (Histórico do X)
+    ↓
+2. Chunking e Pré-processamento
+    ↓
+3. Geração de Embeddings
+    ↓
+4. Indexação em Vector Database
+    ↓
+5. Busca Semântica (Query → Top-K Resultados)
+    ↓
+6. Geração de Resposta (LLM + Contexto)
+    ↓
+7. Ranking de Fontes Verificáveis
+```
+
+## 1. Ingestão de Dados
+
+### Conectores Suportados
+
+<CardGrid>
+  <Card title="Twitter/X" icon="user">
+    Extração de tweets, replies e threads via API v2 (Academic).
+  </Card>
+  <Card title="Supabase" icon="database">
+    Sincronização automática de dados normalizados.
+  </Card>
+  <Card title="Webhooks" icon="link">
+    Recebe dados em tempo real via triggers.
+  </Card>
+</CardGrid>
+
+### Pipeline de Ingestão
+
+```typescript
+// pseudocode
+interface DataIngestionPipeline {
+  source: "twitter" | "supabase" | "webhook";
+  extractData(): Promise<RawDocument[]>;
+  normalize(): Promise<Document[]>;
+  persistToDb(): Promise<void>;
+}
+
+const inggester = new TwitterIngestor({
+  apiKey: process.env.TWITTER_API_KEY,
+  hashtags: ["#crypto", "#blockchain"],
+  pollInterval: 3600, // 1 hora
+});
+
+// Dispara ingestão periódica
+inggester.start();
+```
+
+<Aside type="tip">
+  Use `@crypto/ingestors` do monorepo para plugar novos conectores.
+</Aside>
+
+## 2. Chunking e Pré-processamento
+
+Documentos brutos são divididos em chunks otimizados para embeddings.
+
+### Estratégia de Chunking
+
+| Parâmetro  | Valor      | Descrição                             |
+| ---------- | ---------- | ------------------------------------- |
+| Chunk Size | 512 tokens | Tamanho médio do trecho               |
+| Overlap    | 50 tokens  | Sobreposição entre chunks (contexto)  |
+| Strategy   | Semantic   | Divide em pontos lógicos (parágrafos) |
+
+### Exemplo de Chunk
+
+```json
+{
+  "id": "tweet_123456_chunk_1",
+  "source": "twitter",
+  "source_id": "123456",
+  "content": "Bitcoin atingiu nova máxima histórica de $72k...",
+  "metadata": {
+    "author": "@cryptonews",
+    "timestamp": "2024-03-02T10:30:00Z",
+    "url": "https://x.com/cryptonews/status/123456",
+    "language": "pt"
+  },
+  "tokens_count": 48
+}
+```
+
+## 3. Geração de Embeddings
+
+Cada chunk é convertido para vetor numérico (embedding) usando modelo de embedding.
+
+### Modelo Padrão
+
+- **Modelo**: `text-embedding-3-small` (OpenAI)
+- **Dimensões**: 1536
+- **Contexto**: até 8.191 tokens
+
+```typescript
+import { OpenAIEmbeddings } from "@langchain/openai";
+
+const embeddings = new OpenAIEmbeddings({
+  modelName: "text-embedding-3-small",
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const vector = await embeddings.embedQuery(chunkContent);
+// vector: [0.123, -0.456, 0.789, ...]
+```
+
+<Aside type="note">
+  Embeddings são gerados **uma vez** e cacheados. Re-gere apenas para conteúdo
+  novo/atualizado.
+</Aside>
+
+## 4. Indexação em Vector Database
+
+Embeddings são indexados em Qdrant (ou Pinecone) para busca rápida aproximada (ANN).
+
+### Qdrant: Setup Local
+
+```bash
+# Docker
+docker run -p 6333:6333 qdrant/qdrant
+
+# Ou via Bun (binário nativo)
+qdrant run --storage-path ./qdrant_storage
+```
+
+### Criar Índice
+
+```typescript
+import { QdrantClient } from "@qdrant/js-client-rest";
+
+const client = new QdrantClient({ url: "http://localhost:6333" });
+
+const collectionName = "cryptograma_tweets";
+
+await client.createCollection(collectionName, {
+  vectors: {
+    size: 1536,
+    distance: "Cosine",
+  },
+  optimizers_config: {
+    default_segment_size: 1000000,
+  },
+});
+
+// Inserir pontos
+await client.upsert(collectionName, {
+  points: [
+    {
+      id: "tweet_123456_chunk_1",
+      vector: [0.123, -0.456, ...],
+      payload: {
+        content: "Bitcoin atingiu...",
+        source_url: "https://x.com/...",
+        timestamp: 1709367000,
+      },
+    },
+  ],
+});
+```
+
+## 5. Busca Semântica
+
+Query do usuário é convertida para embedding e comparada com o índice.
+
+### Fluxo de Busca
+
+```typescript
+async function semanticSearch(query: string, topK: number = 5) {
+  // 1. Embed a query
+  const queryVector = await embeddings.embedQuery(query);
+
+  // 2. Busca em Qdrant
+  const results = await client.search(collectionName, {
+    vector: queryVector,
+    limit: topK,
+    score_threshold: 0.7, // Mínimo de similaridade
+  });
+
+  // 3. Retorna chunks com score
+  return results.map((hit) => ({
+    chunk_id: hit.id,
+    similarity_score: hit.score,
+    content: hit.payload.content,
+    source_url: hit.payload.source_url,
+  }));
+}
+
+// Uso
+const results = await semanticSearch("Qual a posição do Bitcoin agora?", 5);
+```
+
+### Exemplo de Resultado
+
+```json
+{
+  "query": "Qual a posição do Bitcoin agora?",
+  "results": [
+    {
+      "rank": 1,
+      "chunk_id": "tweet_123456_chunk_1",
+      "similarity_score": 0.92,
+      "source": "https://x.com/cryptonews/status/123456",
+      "content": "Bitcoin atingiu nova máxima de $72k em março de 2024...",
+      "timestamp": "2024-03-02T10:30:00Z"
+    }
+  ]
+}
+```
+
+<Aside type="caution">
+  Scores acima de **0.85** retornam resultados muito relevantes. Abaixo de
+  **0.70**, considera-se fora de contexto.
+</Aside>
+
+## 6. Geração de Resposta com LLM
+
+Contexto recuperado alimenta o LLM (OpenAI GPT-4) para gerar resposta.
+
+### Prompt Template
+
+```
+Sistema: Você é um especialista em criptografia e análise de dados do X.
+Responda com base APENAS nas fontes fornecidas. Se não souber, diga "Não tenho contexto para responder".
+
+Contexto:
+{context_chunks}
+
+Pergunta do usuário:
+{user_query}
+
+Resposta:
+```
+
+### Implementação
+
+```typescript
+import { ChatOpenAI } from "@langchain/openai";
+import { PromptTemplate, LLMChain } from "@langchain/core";
+
+const llm = new ChatOpenAI({
+  modelName: "gpt-4",
+  temperature: 0.2, // Menor = mais determinístico
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const template = `Sistema: Você é um especialista em criptografia e análise de dados do X.
+Responda com base APENAS nas fontes fornecidas.
+
+Contexto:
+{context}
+
+Pergunta:
+{query}
+
+Resposta:`;
+
+const prompt = new PromptTemplate({
+  template,
+  inputVariables: ["context", "query"],
+});
+
+const chain = new LLMChain({ llm, prompt });
+
+const response = await chain.call({
+  context: resultsContext,
+  query: userQuery,
+});
+```
+
+## 7. Ranking de Fontes Verificáveis
+
+Cada resposta inclui fontes linkadas e verificáveis.
+
+### Attestation Chain
+
+```json
+{
+  "response": "Bitcoin atingiu $72k em março de 2024.",
+  "confidence": 0.95,
+  "sources": [
+    {
+      "rank": 1,
+      "type": "twitter",
+      "author": "@cryptonews",
+      "timestamp": "2024-03-02T10:30:00Z",
+      "url": "https://x.com/cryptonews/status/123456",
+      "relevance_score": 0.92
+    }
+  ],
+  "generated_at": "2024-03-02T10:31:00Z",
+  "model": "gpt-4"
+}
+```
+
+## Monitoramento e Observabilidade
+
+### Métricas Principais
+
+- **Latência de Busca**: tempo end-to-end (Query → Resposta)
+- **Relevância Mean**: average similarity score dos top-K
+- **Cache Hit Rate**: % de queries já respondidas
+- **Embedding Cost**: tokens processados no OpenAI
+
+```bash
+# Via Prometheus
+GET /metrics
+```
+
+## Próximas Etapas
+
+- ✅ [Content Studio](/02-modulos/content-studio/)
+- ✅ [Design Tokens](/03-design-system/tokens/)
+- ✅ [Setup do Monorepo](/01-engenharia/setup-monorepo/)
