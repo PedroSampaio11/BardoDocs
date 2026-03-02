@@ -1,0 +1,40 @@
+---
+title: Cryptograma
+description: Documentação técnica da inteligência de dados e RAG do Bardo.
+---
+
+title: Cryptograma
+description: Dashboard de navegação para a engenharia do Cryptograma.
+
+hero:
+tagline: Engineering Hub — Inteligência de Dados, RAG e Content Studio
+actions: - text: Engenharia
+link: /01-engenharia/
+icon: gear - text: Módulos
+link: /02-modulos/
+icon: cubes - text: Design System
+link: /03-design-system/
+icon: palette
+
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+## Engineering Hub
+
+<CardGrid className="dashboard-grid" stagger>
+  <Card title="Inteligência de Dados" icon="chart">
+    Pipelines de ingestão, ETL/ELT, e integrações do monorepo (Bun, Supabase).
+    <a href="/01-engenharia/">Ver engenharia →</a>
+  </Card>
+
+<Card title="Busca Semântica (RAG)" icon="search">
+  Arquitetura de Retrieval, embeddings e orquestração de respostas (RAG).
+  <a href="/02-modulos/">Ver módulos →</a>
+</Card>
+
+  <Card title="Produção de Conteúdo" icon="document">
+    Content Studio, workflows de criação e padrões para publicação.
+    <a href="/03-design-system/">Ver design system →</a>
+  </Card>
+</CardGrid>

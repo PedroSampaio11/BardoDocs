@@ -1,0 +1,79 @@
+@import "@fontsource/space-grotesk";
+
+:root {
+  --sl-font: "Space Grotesk", system-ui, sans-serif;
+  --sl-color-bg: #030712; /* Background principal */
+  --sl-color-text: #f9fafb; /* Texto */
+  --sl-color-sub: #8f97a5; /* Sub-color */
+  --sl-color-card-bg: #090e1a; /* Card background */
+  --sl-color-card-border: #1f2937; /* Card border */
+}
+
+/* Theme-aware overrides (keeps dark-first palette) */
+:root[data-theme="dark"] {
+  --sl-color-bg: #030712;
+  --sl-color-text: #f9fafb;
+}
+
+html,
+body {
+  background: var(--sl-color-bg);
+  color: var(--sl-color-text);
+  font-family: var(--sl-font);
+}
+
+/* Card styling for Starlight Card components and generic cards */
+/* Targets common classnames used by Starlight or markup that wraps card content */
+.card,
+.sl-card,
+.starlight-card,
+article.card,
+[data-sl-card] {
+  background: var(--sl-color-card-bg);
+  border: 1px solid var(--sl-color-card-border);
+  border-radius: 10px;
+  padding: 1rem;
+  box-shadow: 0 6px 18px rgba(2, 6, 23, 0.5);
+}
+
+.card h3,
+.sl-card h3,
+.starlight-card h3 {
+  color: var(--sl-color-text);
+}
+
+.card p,
+.sl-card p,
+.starlight-card p {
+  color: var(--sl-color-sub);
+}
+
+/* Subtle focus outline for accessibility */
+.card:focus,
+.sl-card:focus,
+.starlight-card:focus {
+  outline: 2px solid rgba(59, 130, 246, 0.18);
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar tuned for the dark theme */
+::-webkit-scrollbar {
+  width: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f2937;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #374151;
+}
+
+/* Small utility: center dashboard grid */
+.dashboard-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
